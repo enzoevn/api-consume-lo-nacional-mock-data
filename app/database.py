@@ -123,7 +123,7 @@ def create_mock_data():
     )
     product2 = Product(
         id=product2_id,
-        image=f"{BLOB_URL}/jamón-ibérico.jpg",
+        image=f"{BLOB_URL}/jamon-iberico.jpg",
         regions=["ES-EX", "ES-AN"],
         productLanContents=[product2_content_es],
         creationDate=datetime.now() - timedelta(days=10),
@@ -141,7 +141,7 @@ def create_mock_data():
         lan=Language.ES,
         title="El aceite de oliva en la dieta mediterránea",
         description="Beneficios del aceite de oliva en la dieta mediterránea",
-        image="https://storage.lucantel.es/browser/consume-images",
+        image=f"{BLOB_URL}/aceite-oliva.png",
         creationDate=datetime.now() - timedelta(days=5),
     )
 
@@ -152,7 +152,7 @@ def create_mock_data():
         lan=Language.ES,
         title="Proceso de curación del jamón ibérico",
         description="Detalles del proceso de curación del jamón ibérico de bellota",
-        image="https://assets.supermercadosmas.com/img/615x615/product/image/294666/294666.jpg",
+        image=f"{BLOB_URL}/jamón-ibérico.jpg",
         creationDate=datetime.now() - timedelta(days=3),
     )
 

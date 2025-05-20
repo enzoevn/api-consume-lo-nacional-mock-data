@@ -134,7 +134,7 @@ def create_mock_data():
         lan=Language.ES,
         title="El aceite de oliva en la dieta mediterránea",
         description="Beneficios del aceite de oliva en la dieta mediterránea",
-        image="https://www.aceitesalbert.com/aceite-oliva/aceite-de-oliva-en-verano-5-reglas-para-conservarlo-mejor/",
+        image="https://www.aceitesalbert.com/wp-content/uploads/2020/07/verano-recortado.png",
         creationDate=datetime.now() - timedelta(days=5),
     )
 

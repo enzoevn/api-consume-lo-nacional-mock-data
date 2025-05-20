@@ -1,0 +1,841 @@
+openapi: 3.0.3
+info:
+  title: Platform API
+  version: 1.0.0
+  description: API for user registration, product and blog management, resource tracking, and forums.
+
+components:
+  schemas:
+    Role:
+      type: string
+      enum: [USER, EMPLOYEE]
+
+    Language:
+      type: string
+      enum: [es-ES, en-US]
+
+    AccessDevice:
+      type: string
+      enum: [WEB, MOBILE]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        nickName:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        image:
+          type: string
+        isBloqued:
+          type: boolean
+        creationDate:
+          type: string
+          format: date-time
+
+    ProductLanContent:
+      type: object
+      properties:
+        lan:
+          $ref: "#/components/schemas/Language"
+        name:
+          type: string
+        description:
+          type: string
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        image:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+        regions:
+          type: array
+          items:
+            type: string
+            description: ISO 3166-2:ES region code
+        productLanContents:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductLanContent"
+
+    BlogComment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        blogId:
+          type: string
+          format: uuid
+        user:
+          $ref: "#/components/schemas/User"
+        comment:
+          type: string
+        image:
+          type: string
+          nullable: true
+        nLikes:
+          type: integer
+        creationDate:
+          type: string
+          format: date-time
+
+    Blog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        product:
+          $ref: "#/components/schemas/Product"
+        lan:
+          $ref: "#/components/schemas/Language"
+        title:
+          type: string
+        description:
+          type: string
+        image:
+          type: string
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/BlogComment"
+        creationDate:
+          type: string
+          format: date-time
+
+    ProductRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+        image:
+          type: string
+        description:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+
+    BlogRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+        title:
+          type: string
+        description:
+          type: string
+        product:
+          $ref: "#/components/schemas/Product"
+        image:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+
+    ResourceAccess:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user:
+          $ref: "#/components/schemas/User"
+          nullable: true
+        accessDate:
+          type: string
+          format: date-time
+        deviceType:
+          $ref: "#/components/schemas/AccessDevice"
+
+    Forum:
+      type: object
+      properties:
+        regionId:
+          type: string
+        regionName:
+          type: string
+
+    ThreadComment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+          format: uuid
+        user:
+          $ref: "#/components/schemas/User"
+        content:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+
+    Thread:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        regionId:
+          type: string
+        lan:
+          $ref: "#/components/schemas/Language"
+        title:
+          type: string
+        description:
+          type: string
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/ThreadComment"
+        creationDate:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+
+paths:
+  /users/auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                nickName:
+                  type: string
+                role:
+                  $ref: "#/components/schemas/Role"
+                password:
+                  type: string
+                image:
+                  type: string
+      tags:
+        - users
+      responses:
+        "201":
+          description: User created successfully
+        "400":
+          description: Email or nickname exists or invalid input
+        "401":
+          description: Unauthorized to create EMPLOYEE role
+
+  /users/auth/login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      tags:
+        - users
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bearer:
+                    type: string
+        "401":
+          description: Invalid email or password
+
+  /users/{id}/block:
+    put:
+      summary: Block a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      tags:
+        - users
+      responses:
+        "201":
+          description: User blocked
+        "401":
+          description: Unauthorized
+
+  /users/{id}/unblock:
+    put:
+      summary: Unblock a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      tags:
+        - users
+      responses:
+        "201":
+          description: User unblocked
+        "401":
+          description: Unauthorized
+
+  /users/me:
+    get:
+      summary: Get current user info
+      tags:
+        - users
+      responses:
+        "200":
+          description: Current user info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /users:
+    get:
+      summary: Get list of users
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          required: false
+      tags:
+        - users
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  /resources/accesses:
+    get:
+      summary: Get the last 100 resource access logs
+      tags:
+        - users
+      responses:
+        "200":
+          description: List of resource access logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ResourceAccess"
+        "401":
+          description: Unauthorized
+
+  /products:
+    post:
+      summary: Create base product structure
+      tags:
+        - products
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                regions:
+                  type: string
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Bad request
+        "401":
+          description: Forbidden
+    get:
+      summary: Search products
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: region
+          schema:
+            type: string
+      tags:
+        - products
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+  /products/{id}/product-content:
+    post:
+      summary: Add localized product information
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lan:
+                  $ref: "#/components/schemas/Language"
+                name:
+                  type: string
+                description:
+                  type: string
+      tags:
+        - products
+      responses:
+        "201":
+          description: Product content added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Bad request
+        "401":
+          description: Forbidden
+
+  /products/{id}:
+    get:
+      summary: Get product by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      tags:
+        - products
+      responses:
+        "201":
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+
+
+  /blogs/{id}/comments:
+    post:
+      summary: Add a comment to a blog
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                comment:
+                  type: string
+                image:
+                  type: string
+                  nullable: true
+      tags:
+        - blogs
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+
+  /blogs/comments/{id}/like:
+    post:
+      summary: Like a blog comment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      tags:
+        - blogs
+      responses:
+        "201":
+          description: Like added
+        "400":
+          description: Already liked
+        "401":
+          description: Unauthorized
+
+  /blogs/{id}:
+    get:
+      summary: Get blog by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      tags:
+        - blogs
+      responses:
+        "200":
+          description: Blog found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Blog"
+        "404":
+          description: Not found
+
+  /blogs:
+    get:
+      summary: Search blogs
+      parameters:
+        - in: query
+          name: name
+          schema:
+            type: string
+        - in: query
+          name: productId
+          schema:
+            type: string
+      tags:
+        - blogs
+      responses:
+        "200":
+          description: List of blogs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Blog"
+
+  /requests/products:
+    post:
+      summary: Submit product request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                userId:
+                  type: string
+                image:
+                  type: string
+                description:
+                  type: string
+      tags:
+        - requests
+      responses:
+        "201":
+          description: Product request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+    get:
+      summary: Get product requests
+      tags:
+        - products
+      responses:
+        "200":
+          description: List of product requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProductRequest"
+
+  /requests/blogs:
+    post:
+      summary: Submit blog request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                productId:
+                  type: string
+                userId:
+                  type: string
+                image:
+                  type: string
+                description:
+                  type: string
+      tags:
+        - requests
+      responses:
+        "201":
+          description: Blog request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+    get:
+      summary: Get blog requests
+      tags:
+        - requests
+      responses:
+        "200":
+          description: List of blog requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlogRequest"
+
+  /requests/blogs/{id}/comment:
+    post:
+      summary: Add comment to blog request
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                blogId:
+                  type: string
+                userId:
+                  type: string
+                comment:
+                  type: string
+                image:
+                  type: string
+                  nullable: true
+      tags:
+        - requests
+      responses:
+        "201":
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+
+  /forums:
+    get:
+      summary: Get all forums
+      tags:
+        - forums
+      responses:
+        "200":
+          description: List of forums
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Forum"
+
+  /threads/{regionId}:
+    get:
+      summary: Get threads by region
+      parameters:
+        - in: path
+          name: regionId
+          required: true
+          schema:
+            type: string
+      tags:
+        - forums
+      responses:
+        "200":
+          description: List of threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Thread"
+
+  /threads:
+    post:
+      summary: Create a new thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                regionId:
+                  type: string
+                lan:
+                  $ref: "#/components/schemas/Language"
+                title:
+                  type: string
+                description:
+                  type: string
+      tags:
+        - forums
+      responses:
+        "201":
+          description: Thread created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized
+
+  /threads/comments:
+    post:
+      summary: Add a comment to a thread
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                threadId:
+                  type: string
+                userId:
+                  type: string
+                content:
+                  type: string
+      tags:
+        - forums
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "400":
+          description: Invalid input
+        "401":
+          description: Unauthorized

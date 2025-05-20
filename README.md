@@ -56,8 +56,18 @@ docker-compose down
 
 Una vez iniciado el servidor, puedes acceder a la documentación interactiva en:
 
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:8000/api/v1/docs
+- ReDoc: http://localhost:8000/api/v1/redoc
+
+## Endpoints Principales
+
+- Login: `POST /api/v1/users/auth/login`
+- Registro: `POST /api/v1/users/auth/register`
+- Información del usuario: `GET /api/v1/users/me`
+- Lista de usuarios: `GET /api/v1/users`
+- Productos: `GET /api/v1/products`
+- Blogs: `GET /api/v1/blogs`
+- Foros: `GET /api/v1/forums`
 
 ## Usuarios Mock
 

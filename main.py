@@ -39,11 +39,11 @@ app.add_middleware(
 )
 
 # Incluir routers
-app.include_router(users.router)
-app.include_router(products.router)
-app.include_router(blogs.router)
-app.include_router(requests.router)
-app.include_router(forums.router)
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(products.router, prefix="/api/v1")
+app.include_router(blogs.router, prefix="/api/v1")
+app.include_router(requests.router, prefix="/api/v1")
+app.include_router(forums.router, prefix="/api/v1")
 
 # Configurar seguridad global
 app.swagger_ui_init_oauth = {"usePkceWithAuthorizationCodeGrant": True}

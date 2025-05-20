@@ -25,6 +25,8 @@ app = FastAPI(
     description="API para registro de usuarios, gestión de productos y blogs, seguimiento de recursos y foros.",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
 )
 
 # Configurar CORS
@@ -38,7 +40,7 @@ app.add_middleware(
 
 # Incluir routers
 app.include_router(users.router)
-app.include_router(products.router, prefix="/api/v1")
+app.include_router(products.router)
 app.include_router(blogs.router)
 app.include_router(requests.router)
 app.include_router(forums.router)

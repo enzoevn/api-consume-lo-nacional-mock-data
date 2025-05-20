@@ -1,7 +1,10 @@
+import os
 import random
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from uuid import UUID, uuid4
+
+from dotenv import load_dotenv
 
 from app.models import (
     AccessDevice,
@@ -19,6 +22,10 @@ from app.models import (
     ThreadComment,
     User,
 )
+
+load_dotenv()
+
+BLOB_URL = os.getenv("BLOB_URL")
 
 
 # Base de datos simulada
@@ -104,7 +111,7 @@ def create_mock_data():
     )
     product1 = Product(
         id=product1_id,
-        image="https://www.aceitesalbert.com/aceite-oliva/aceite-de-oliva-en-verano-5-reglas-para-conservarlo-mejor/",
+        image=f"{BLOB_URL}/aceite-oliva.png",
         regions=["ES-AN", "ES-CM"],
         productLanContents=[product1_content_es, product1_content_en],
         creationDate=datetime.now() - timedelta(days=15),
@@ -116,7 +123,7 @@ def create_mock_data():
     )
     product2 = Product(
         id=product2_id,
-        image="https://assets.supermercadosmas.com/img/615x615/product/image/294666/294666.jpg",
+        image=f"{BLOB_URL}/jamón-ibérico.jpg",
         regions=["ES-EX", "ES-AN"],
         productLanContents=[product2_content_es],
         creationDate=datetime.now() - timedelta(days=10),
@@ -134,7 +141,7 @@ def create_mock_data():
         lan=Language.ES,
         title="El aceite de oliva en la dieta mediterránea",
         description="Beneficios del aceite de oliva en la dieta mediterránea",
-        image="https://www.aceitesalbert.com/wp-content/uploads/2020/07/verano-recortado.png",
+        image="https://storage.lucantel.es/browser/consume-images",
         creationDate=datetime.now() - timedelta(days=5),
     )
 

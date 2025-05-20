@@ -104,7 +104,7 @@ def create_mock_data():
     )
     product1 = Product(
         id=product1_id,
-        image="https://example.com/images/product1.jpg",
+        image="https://www.aceitesalbert.com/aceite-oliva/aceite-de-oliva-en-verano-5-reglas-para-conservarlo-mejor/",
         regions=["ES-AN", "ES-CM"],
         productLanContents=[product1_content_es, product1_content_en],
         creationDate=datetime.now() - timedelta(days=15),
@@ -116,7 +116,7 @@ def create_mock_data():
     )
     product2 = Product(
         id=product2_id,
-        image="https://example.com/images/product2.jpg",
+        image="https://assets.supermercadosmas.com/img/615x615/product/image/294666/294666.jpg",
         regions=["ES-EX", "ES-AN"],
         productLanContents=[product2_content_es],
         creationDate=datetime.now() - timedelta(days=10),
@@ -134,7 +134,7 @@ def create_mock_data():
         lan=Language.ES,
         title="El aceite de oliva en la dieta mediterránea",
         description="Beneficios del aceite de oliva en la dieta mediterránea",
-        image="https://example.com/images/blog1.jpg",
+        image="https://www.aceitesalbert.com/aceite-oliva/aceite-de-oliva-en-verano-5-reglas-para-conservarlo-mejor/",
         creationDate=datetime.now() - timedelta(days=5),
     )
 
@@ -145,7 +145,7 @@ def create_mock_data():
         lan=Language.ES,
         title="Proceso de curación del jamón ibérico",
         description="Detalles del proceso de curación del jamón ibérico de bellota",
-        image="https://example.com/images/blog2.jpg",
+        image="https://assets.supermercadosmas.com/img/615x615/product/image/294666/294666.jpg",
         creationDate=datetime.now() - timedelta(days=3),
     )
 

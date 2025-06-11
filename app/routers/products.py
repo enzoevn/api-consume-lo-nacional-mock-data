@@ -1,98 +1,113 @@
 from typing import List, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from app.database import Database
+from app.db.connection import get_db
 from app.models import (
     CreateProductBase,
     CreateProductContent,
-    Product,
-    ProductLanContent,
-    ProductRequest,
+    ProductRequestResponse,
+    ProductResponse,
+    User,
 )
-from app.routers.users import check_admin
+from app.repository.product_repository import ProductRepository
+from app.repository.request_repository import RequestRepository
+from app.services.auth_service import get_current_active_user
 
 router = APIRouter(tags=["products"])
 
 
+def get_product_repository(db: Session = Depends(get_db)) -> ProductRepository:
+    return ProductRepository(db)
+
+
+def get_request_repository(db: Session = Depends(get_db)) -> RequestRepository:
+    return RequestRepository(db)
+
+
 @router.post("/products", status_code=201)
-def create_product(product_data: CreateProductBase, admin=Depends(check_admin)):
-    new_product = Product(
-        id=uuid4(),
-        image=product_data.image,
-        regions=product_data.regions,
-        productLanContents=[],
-    )
-
-    Database.products[new_product.id] = new_product
-
-    return {"id": str(new_product.id)}
+async def create_product(
+    product_data: CreateProductBase,
+    _: User = Depends(get_current_active_user),
+    product_repository: ProductRepository = Depends(get_product_repository),
+):
+    product = product_repository.create(product_data)
+    return {"id": str(product.id)}
 
 
-@router.get("/products", response_model=List[Product])
-def search_products(name: Optional[str] = None, region: Optional[str] = None):
-    results = list(Database.products.values())
+@router.get("/products", response_model=List[ProductResponse])
+async def search_products(
+    name: Optional[str] = None,
+    region: Optional[str] = None,
+    product_repository: ProductRepository = Depends(get_product_repository),
+):
+    if name and region:
+        # Buscar por nombre y región
+        products_by_name = set(product_repository.search_by_name(name))
+        products_by_region = set(product_repository.search_by_region(region))
+        products = list(products_by_name.intersection(products_by_region))
+    elif name:
+        # Buscar solo por nombre
+        products = product_repository.search_by_name(name)
+    elif region:
+        # Buscar solo por región
+        products = product_repository.search_by_region(region)
+    else:
+        # Devolver todos los productos
+        products = product_repository.get_all()
 
-    if name:
-        # Filtrar por nombre en cualquier idioma
-        results = [
-            product
-            for product in results
-            if any(
-                name.lower() in content.name.lower()
-                for content in product.productLanContents
-            )
-        ]
-
-    if region:
-        # Filtrar por región
-        results = [product for product in results if region in product.regions]
-
-    return results
+    # Convertir los productos al formato de respuesta
+    return [
+        {
+            "id": product.id,
+            "image": product.image,
+            "creationDate": product.creation_date,
+            "regions": [region.region_code for region in product.regions],
+            "productLanContents": product.product_lan_contents,
+        }
+        for product in products
+    ]
 
 
 @router.post("/products/{id}/product-content", status_code=201)
-def add_product_content(
-    id: str, content_data: CreateProductContent, admin=Depends(check_admin)
+async def add_product_content(
+    id: UUID,
+    content_data: CreateProductContent,
+    _: User = Depends(get_current_active_user),
+    product_repository: ProductRepository = Depends(get_product_repository),
 ):
-    try:
-        product_id = UUID(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-
-    if product_id not in Database.products:
+    product = product_repository.add_content(id, content_data)
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    product = Database.products[product_id]
-    product_content = ProductLanContent(**content_data.dict())
-
-    # Verificar si ya existe contenido para ese idioma
-    for i, content in enumerate(product.productLanContents):
-        if content.lan == content_data.lan:
-            # Actualizar el contenido existente
-            product.productLanContents[i] = product_content
-            return {"id": str(product_id)}
-
-    # Añadir nuevo contenido
-    product.productLanContents.append(product_content)
-
-    return {"id": str(product_id)}
+    return {"id": str(product.id)}
 
 
-@router.get("/products/{id}", response_model=Product)
-def get_product_by_id(id: str):
-    try:
-        product_id = UUID(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid product ID")
-
-    if product_id not in Database.products:
+@router.get("/products/{id}", response_model=ProductResponse)
+async def get_product_by_id(
+    id: UUID,
+    product_repository: ProductRepository = Depends(get_product_repository),
+):
+    product = product_repository.get_by_id(id)
+    if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    return Database.products[product_id]
+    # Convertir las regiones a una lista de strings
+    regions = [region.region_code for region in product.regions]
+    return {
+        "id": product.id,
+        "image": product.image,
+        "creationDate": product.creation_date,
+        "regions": regions,
+        "productLanContents": product.product_lan_contents,
+    }
 
 
-@router.get("/requests/products", response_model=List[ProductRequest])
-def get_product_requests(admin=Depends(check_admin)):
-    return list(Database.product_requests.values())
+@router.get("/requests/products", response_model=List[ProductRequestResponse])
+async def get_product_requests(
+    _: User = Depends(get_current_active_user),
+    request_repository: RequestRepository = Depends(get_request_repository),
+):
+    return request_repository.get_product_requests()

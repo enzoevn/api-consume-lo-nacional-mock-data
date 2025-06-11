@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
 # Inicializar la aplicación FastAPI
 app = FastAPI(
-    title="Consume Lo Nacional API Mock",
+    title="Consume Lo Nacional API REST",
     description="API para registro de usuarios, gestión de productos y blogs, seguimiento de recursos y foros.",
     version="1.0.0",
     lifespan=lifespan,

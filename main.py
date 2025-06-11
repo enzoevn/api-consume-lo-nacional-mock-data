@@ -1,21 +1,29 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 
-from app.database import Database, create_mock_data
-from app.models import AccessDevice, ResourceAccess
+# from app.database import Database, create_mock_data
+from app.models import AccessDevice
 from app.routers import blogs, forums, products, requests, users
+from app.services.logger_service import LoggerService
 
 security = HTTPBearer()
+
+# Inicializar el servicio de logs
+logger = LoggerService()
+
+# Asegurar que el directorio logs existe
+os.makedirs("logs", exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manejador de eventos del ciclo de vida de la aplicación."""
     # Inicializar datos mock al arrancar
-    create_mock_data()
+    # create_mock_data()
     yield
 
 
@@ -56,12 +64,13 @@ async def log_requests(request: Request, call_next):
     user_agent = request.headers.get("user-agent", "").lower()
     device_type = AccessDevice.MOBILE if "mobile" in user_agent else AccessDevice.WEB
 
-    # Registrar el acceso
-    access = ResourceAccess(
-        user=None,  # En una implementación real, obtendríamos el usuario autenticado
-        deviceType=device_type,
+    # Registrar el acceso usando el servicio de logs
+    logger.log_access(
+        path=request.url.path,
+        method=request.method,
+        device_type=device_type,
+        user_agent=user_agent,
     )
-    Database.resource_accesses.append(access)
 
     response = await call_next(request)
     return response

@@ -13,3 +13,7 @@ wheels/
 .venv
 
 main_test.py
+
+generate_hash.py
+/logs
+mermaid.txt

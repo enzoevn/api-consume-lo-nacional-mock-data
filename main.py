@@ -19,6 +19,7 @@ logger = LoggerService()
 os.makedirs("logs", exist_ok=True)
 
 
+# Esto solo se usa para inicializar datos mock al arrancar, ahora se usa la base de datos
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manejador de eventos del ciclo de vida de la aplicación."""

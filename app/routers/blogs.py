@@ -1,110 +1,97 @@
-from typing import List, Optional
-from uuid import UUID, uuid4
+from typing import List
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from app.database import Database
-from app.models import Blog, BlogComment, CreateBlogComment, User
-from app.routers.users import get_current_user
+from app.db.connection import get_db
+from app.models import (
+    Blog,
+    CreateBlog,
+    CreateBlogComment,
+    Language,
+    User,
+)
+from app.repository.blog_repository import BlogRepository
+from app.services.auth_service import get_current_active_user
 
 router = APIRouter(tags=["blogs"])
 
 
+def get_blog_repository(db: Session = Depends(get_db)) -> BlogRepository:
+    return BlogRepository(db)
+
+
+@router.post("/blogs", status_code=201, operation_id="create_blog")
+def create_blog(
+    blog_data: CreateBlog,
+    current_user: User = Depends(get_current_active_user),
+    blog_repository: BlogRepository = Depends(get_blog_repository),
+):
+    # Verificar que el usuario es un empleado
+    if current_user.role != "EMPLOYEE":
+        raise HTTPException(
+            status_code=403, detail="Solo los empleados pueden crear blogs"
+        )
+
+    # Verificar que al menos hay contenido en español
+    if not any(content.lan == Language.ES for content in blog_data.contents):
+        raise HTTPException(
+            status_code=400,
+            detail="El blog debe tener al menos el contenido en español",
+        )
+
+    # Crear el blog con sus contenidos
+    blog = blog_repository.create(blog_data)
+    return {"id": str(blog.id)}
+
+
 @router.post("/blogs/{id}/comments", status_code=201)
 def add_blog_comment(
-    id: str,
+    id: UUID,
     comment_data: CreateBlogComment,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
+    blog_repository: BlogRepository = Depends(get_blog_repository),
 ):
-    try:
-        blog_id = UUID(id)
-        user_id = comment_data.userId
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid ID format")
-
-    # Verificar que el blog existe
-    if blog_id not in Database.blogs:
-        raise HTTPException(status_code=404, detail="Blog not found")
-
-    # Verificar que el usuario existe
-    if user_id not in Database.users:
-        raise HTTPException(status_code=400, detail="User not found")
-
     # Verificar que el usuario que hace el comentario es el mismo que está autenticado
-    if user_id != current_user.id:
+    if comment_data.userId != current_user.id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Crear comentario
-    new_comment = BlogComment(
-        id=uuid4(),
-        blogId=blog_id,
-        user=Database.users[user_id],
-        comment=comment_data.comment,
-        image=comment_data.image,
-        nLikes=0,
-    )
+    comment = blog_repository.add_comment(id, comment_data, current_user.id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Blog not found")
 
-    # Guardar comentario en la base de datos
-    Database.blog_comments[new_comment.id] = new_comment
-
-    # Añadir comentario al blog
-    Database.blogs[blog_id].comments.append(new_comment)
-
-    return {"id": str(new_comment.id)}
+    return {"id": str(comment.id)}
 
 
 @router.post("/blogs/comments/{id}/like", status_code=201)
-def like_blog_comment(id: str, current_user: User = Depends(get_current_user)):
-    try:
-        comment_id = UUID(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid comment ID")
-
-    # Verificar que el comentario existe
-    if comment_id not in Database.blog_comments:
+def like_blog_comment(
+    id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    blog_repository: BlogRepository = Depends(get_blog_repository),
+):
+    if not blog_repository.like_comment(id, current_user.id):
         raise HTTPException(status_code=404, detail="Comment not found")
-
-    # Verificar si el usuario ya dio like
-    if current_user.id not in Database.user_likes:
-        Database.user_likes[current_user.id] = []
-
-    if comment_id in Database.user_likes[current_user.id]:
-        raise HTTPException(status_code=400, detail="Already liked")
-
-    # Añadir like
-    Database.user_likes[current_user.id].append(comment_id)
-    Database.blog_comments[comment_id].nLikes += 1
 
     return {"message": "Like added"}
 
 
 @router.get("/blogs/{id}", response_model=Blog)
-def get_blog_by_id(id: str):
-    try:
-        blog_id = UUID(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid blog ID")
-
-    if blog_id not in Database.blogs:
+def get_blog_by_id(
+    id: UUID,
+    blog_repository: BlogRepository = Depends(get_blog_repository),
+):
+    blog = blog_repository.get_by_id(id)
+    if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
 
-    return Database.blogs[blog_id]
+    return blog
 
 
 @router.get("/blogs", response_model=List[Blog])
-def search_blogs(name: Optional[str] = None, productId: Optional[str] = None):
-    results = list(Database.blogs.values())
+def search_blogs(
+    blog_repository: BlogRepository = Depends(get_blog_repository),
+):
+    blogs = blog_repository.get_all()
 
-    if name:
-        # Filtrar por título
-        results = [blog for blog in results if name.lower() in blog.title.lower()]
-
-    if productId:
-        try:
-            product_uuid = UUID(productId)
-            # Filtrar por producto
-            results = [blog for blog in results if blog.product.id == product_uuid]
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid product ID")
-
-    return results
+    return blogs

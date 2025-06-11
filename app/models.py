@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Role(str, Enum):
@@ -24,11 +24,11 @@ class AccessDevice(str, Enum):
 class User(BaseModel):
     id: UUID = uuid4()
     email: str
-    nickName: str
+    nick_name: str
     role: Role
     image: Optional[str] = None
-    isBloqued: bool = False
-    creationDate: datetime = datetime.now()
+    is_blocked: bool = False
+    creation_date: datetime = Field(default_factory=datetime.now, alias="creation_date")
 
 
 class ProductLanContent(BaseModel):
@@ -40,30 +40,43 @@ class ProductLanContent(BaseModel):
 class Product(BaseModel):
     id: UUID = uuid4()
     image: Optional[str] = None
-    creationDate: datetime = datetime.now()
+    creation_date: datetime = Field(default_factory=datetime.now, alias="creation_date")
     regions: List[str]
-    productLanContents: List[ProductLanContent] = []
+    product_lan_contents: List[ProductLanContent] = Field(
+        default_factory=list, alias="product_lan_contents"
+    )
 
 
 class BlogComment(BaseModel):
     id: UUID = uuid4()
-    blogId: UUID
+    blog_id: UUID = Field(alias="blog_id")
     user: User
     comment: str
     image: Optional[str] = None
-    nLikes: int = 0
-    creationDate: datetime = datetime.now()
+    n_likes: int = 0
+    creation_date: datetime = Field(default_factory=datetime.now, alias="creation_date")
 
 
-class Blog(BaseModel):
-    id: UUID = uuid4()
-    product: Product
+class BlogLanContent(BaseModel):
+    blog_id: UUID = Field(alias="blog_id")
     lan: Language
     title: str
     description: str
+
+
+class Blog(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    product_id: UUID = Field(alias="product_id")
     image: Optional[str] = None
-    comments: List[BlogComment] = []
-    creationDate: datetime = datetime.now()
+    blog_lan_contents: List[BlogLanContent] = Field(
+        default_factory=list, alias="blog_lan_contents"
+    )
+    comments: List[BlogComment] = Field(default_factory=list)
+    creation_date: datetime = Field(default_factory=datetime.now, alias="creation_date")
+
+    class Config:
+        from_attributes = True
+        populate_by_name = True
 
 
 class ProductRequest(BaseModel):
@@ -87,8 +100,19 @@ class BlogRequest(BaseModel):
 
 class ResourceAccess(BaseModel):
     id: UUID = uuid4()
-    user: Optional[User] = None
+    userId: UUID
+    resourceType: str
+    resourceId: UUID
+    accessType: str
     accessDate: datetime = datetime.now()
+    deviceType: AccessDevice
+
+
+class CreateResourceAccess(BaseModel):
+    userId: UUID
+    resourceType: str
+    resourceId: UUID
+    accessType: str
     deviceType: AccessDevice
 
 
@@ -122,7 +146,7 @@ class Error(BaseModel):
 # Modelos adicionales para solicitudes de entrada
 class UserRegister(BaseModel):
     email: str
-    nickName: str
+    nick_name: str
     role: Role
     password: str
     image: Optional[str] = None
@@ -187,3 +211,45 @@ class CreateThreadComment(BaseModel):
     threadId: UUID
     userId: UUID
     content: str
+
+
+class ProductRequestResponse(BaseModel):
+    id: UUID
+    name: str
+    userId: UUID
+    image: Optional[str] = None
+    description: str
+    creationDate: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProductResponse(BaseModel):
+    id: UUID
+    image: Optional[str] = None
+    creationDate: datetime
+    regions: List[str]
+    productLanContents: List[ProductLanContent] = []
+
+    class Config:
+        from_attributes = True
+
+
+class BlogRequestResponse(BaseModel):
+    id: UUID
+    userId: UUID
+    title: str
+    description: str
+    productId: UUID
+    image: Optional[str] = None
+    creationDate: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CreateBlog(BaseModel):
+    productId: UUID
+    image: Optional[str] = None
+    contents: List[BlogLanContent]

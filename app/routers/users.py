@@ -1,45 +1,48 @@
-from typing import List, Optional
-from uuid import UUID, uuid4
+from typing import List
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Security
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
-from app.database import Database
-from app.models import LoginResponse, ResourceAccess, User, UserLogin, UserRegister
+from app.db.connection import get_db
+from app.models import (
+    LoginResponse,
+    ResourceAccess,
+    Role,
+    User,
+    UserLogin,
+    UserRegister,
+)
+from app.repository.resource_repository import ResourceRepository
+from app.repository.user_repository import UserRepository
+from app.services.auth_service import (
+    AuthService,
+    get_auth_service,
+    get_current_active_user,
+    get_current_user,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
-security = HTTPBearer()
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-) -> User:
-    token = credentials.credentials
-    user = Database.get_user_by_token(token)
-
-    if not user:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    if user.isBloqued:
-        raise HTTPException(status_code=401, detail="User is blocked")
-
-    return user
+def get_user_repository(db: Session = Depends(get_db)) -> UserRepository:
+    return UserRepository(db)
 
 
-def check_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "EMPLOYEE":
-        raise HTTPException(status_code=401, detail="Admin privileges required")
-    return user
+def get_resource_repository(db: Session = Depends(get_db)) -> ResourceRepository:
+    return ResourceRepository(db)
 
 
 @router.post("/auth/register", status_code=201)
-def register_user(user_data: UserRegister):
+def register_user(
+    user_data: UserRegister,
+    user_repository: UserRepository = Depends(get_user_repository),
+):
     # Verificar si el correo electrónico o el nombre de usuario ya existen
-    for user in Database.users.values():
-        if user.email == user_data.email or user.nickName == user_data.nickName:
-            raise HTTPException(
-                status_code=400, detail="Email or nickname already exists"
-            )
+    if user_repository.get_by_email(user_data.email):
+        raise HTTPException(status_code=400, detail="Email already exists")
+    if user_repository.get_by_nickname(user_data.nick_name):
+        raise HTTPException(status_code=400, detail="Nickname already exists")
 
     # Verificar permisos para roles de empleado
     if user_data.role == "EMPLOYEE":
@@ -48,93 +51,90 @@ def register_user(user_data: UserRegister):
         )
 
     # Crear nuevo usuario
-    new_user = User(
-        id=uuid4(),
-        email=user_data.email,
-        nickName=user_data.nickName,
-        role=user_data.role,
-        image=user_data.image,
-        isBloqued=False,
-        creationDate=Database.users[
-            next(iter(Database.users))
-        ].creationDate,  # Para mantener consistencia en datos mock
-    )
-
-    # Añadir a la base de datos
-    Database.users[new_user.id] = new_user
+    user_repository.create(user_data)
 
     return {"message": "User created successfully"}
 
 
 @router.post("/auth/login", response_model=LoginResponse)
-def login_user(login_data: UserLogin):
-    # En una implementación real, verificaríamos el correo electrónico y la contraseña
-    # Aquí simularemos que cualquier correo electrónico válido en la base de datos funciona
+def login_user(
+    login_data: UserLogin,
+    auth_service: AuthService = Depends(get_auth_service),
+):
+    user = auth_service.authenticate_user(login_data.email, login_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    for user in Database.users.values():
-        if user.email == login_data.email:
-            if user.isBloqued:
-                raise HTTPException(status_code=401, detail="User is blocked")
+    if user.is_blocked:
+        raise HTTPException(status_code=401, detail="User is blocked")
 
-            # Generar token
-            token = Database.generate_token(user.id)
+    # Generar token
+    access_token = auth_service.create_access_token(data={"sub": user.email})
 
-            return LoginResponse(bearer=token)
-
-    raise HTTPException(status_code=401, detail="Invalid email or password")
+    return LoginResponse(bearer=access_token)
 
 
 @router.put("/{id}/block", status_code=201)
-def block_user(id: str, _: User = Depends(check_admin)):
-    try:
-        user_id = UUID(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-
-    if user_id not in Database.users:
+def block_user(
+    id: UUID,
+    _: User = Depends(get_current_active_user),
+    user_repository: UserRepository = Depends(get_user_repository),
+):
+    user = user_repository.get_by_id(id)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    Database.users[user_id].isBloqued = True
-
+    user_repository.block_user(id)
     return {"message": "User blocked"}
 
 
 @router.put("/{id}/unblock", status_code=201)
-def unblock_user(id: str, _: User = Depends(check_admin)):
-    try:
-        user_id = UUID(id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-
-    if user_id not in Database.users:
+def unblock_user(
+    id: UUID,
+    _: User = Depends(get_current_active_user),
+    user_repository: UserRepository = Depends(get_user_repository),
+):
+    user = user_repository.get_by_id(id)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    Database.users[user_id].isBloqued = False
-
+    user_repository.unblock_user(id)
     return {"message": "User unblocked"}
 
 
 @router.get("/me", response_model=User)
-def get_current_user_info(current_user: User = Depends(get_current_user)):
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@router.get("", response_model=List[User])
-def get_users(search: Optional[str] = None, _: User = Depends(check_admin)):
-    if not search:
-        return list(Database.users.values())
-
+@router.get("/", response_model=List[User])
+async def get_users(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.role != Role.EMPLOYEE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+    users = UserRepository(db).get_all()
     return [
-        user
-        for user in Database.users.values()
-        if search.lower() in user.email.lower()
-        or search.lower() in user.nickName.lower()
+        User(
+            id=user.id,
+            email=user.email,
+            nick_name=user.nick_name,
+            role=user.role,
+            image=user.image,
+            is_blocked=user.is_blocked,
+            creation_date=user.creation_date,
+        )
+        for user in users
     ]
 
 
 @router.get("/accesses", response_model=List[ResourceAccess])
-def get_resource_accesses(_: User = Depends(check_admin)):
-    # Devolver los últimos 100 accesos
-    return sorted(Database.resource_accesses, key=lambda x: x.accessDate, reverse=True)[
-        :100
-    ]
+async def get_resource_accesses(
+    _: User = Depends(get_current_active_user),
+    resource_repository: ResourceRepository = Depends(get_resource_repository),
+):
+    return resource_repository.get_all()
